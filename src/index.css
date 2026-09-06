@@ -135,3 +135,13 @@
     min-height: 100vh;
   }
 }
+
+@layer utilities {
+  .dashboard-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .dashboard-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

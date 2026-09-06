@@ -5,11 +5,27 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react"
+import {
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  BookOpen01Icon,
+  BrushIcon,
+  Chart01Icon,
+  CheckmarkBadge01Icon,
+} from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { Difficulty, Problem, ProblemStatus, Todo } from "@/types"
 
-export type DashboardTab = "problems" | "todo" | "review"
+export type DashboardTab = "problems" | "todo" | "review" | "excalidraw"
+
+const tabIcons: Record<DashboardTab, typeof BookOpen01Icon> = {
+  problems: BookOpen01Icon,
+  todo: CheckmarkBadge01Icon,
+  review: Chart01Icon,
+  excalidraw: BrushIcon,
+}
 
 function todoUrlFromTitle(title: string) {
   const slug = title
@@ -83,6 +99,8 @@ export function Sidebar({
   reviewCount,
   email,
   onSignOut,
+  collapsed,
+  onToggleCollapse,
 }: {
   activeTab: DashboardTab
   onTabChange: (tab: DashboardTab) => void
@@ -90,18 +108,47 @@ export function Sidebar({
   reviewCount: number
   email?: string | null
   onSignOut: () => void
+  collapsed: boolean
+  onToggleCollapse: () => void
 }) {
   const items: [DashboardTab, string][] = [
     ["problems", "Problemas"],
     ["todo", "A fazer"],
     ["review", "Revisão"],
+    ["excalidraw", "Desenhar"],
   ]
+
   return (
     <>
-      <aside className="hidden w-56 shrink-0 flex-col border-r pr-6 md:flex">
-        <div className="mb-8 text-lg font-semibold tracking-tight">
-          LeetCode
+      <aside
+        className={`hidden h-[calc(100vh-5rem)] shrink-0 flex-col border-r pr-3 md:flex ${collapsed ? "w-16" : "w-56"} fixed top-6 bottom-6 left-4 z-20`}
+      >
+        <div
+          className={`mb-4 flex items-center pt-1 ${collapsed ? "justify-center" : "justify-between"}`}
+        >
+          <div
+            className={`overflow-hidden text-lg font-semibold tracking-tight transition-all ${collapsed ? "w-0 opacity-0" : "w-auto opacity-100"}`}
+          >
+            Seu Dashboard
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 rounded-md p-0 text-muted-foreground"
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            <HugeiconsIcon
+              icon={collapsed ? ArrowRight01Icon : ArrowLeft01Icon}
+              size={16}
+              strokeWidth={1.8}
+              className="shrink-0"
+            />
+          </Button>
         </div>
+
         <nav className="flex flex-col gap-1" aria-label="Navegação principal">
           {items.map(([tab, label]) => (
             <NavItem
@@ -117,12 +164,16 @@ export function Sidebar({
                     ? reviewCount
                     : undefined
               }
+              collapsed={collapsed}
             />
           ))}
         </nav>
+
         <div className="mt-auto border-t pt-4">
           {email && (
-            <div className="mb-3 truncate px-3 text-xs text-muted-foreground">
+            <div
+              className={`mb-3 truncate px-3 text-xs text-muted-foreground ${collapsed ? "hidden" : "block"}`}
+            >
               {email}
             </div>
           )}
@@ -130,14 +181,16 @@ export function Sidebar({
             <Button
               variant="ghost"
               size="sm"
-              className="w-full justify-start px-3 text-muted-foreground"
+              className={`w-full justify-start px-3 text-muted-foreground ${collapsed ? "justify-center px-2" : ""}`}
               onClick={onSignOut}
+              title={collapsed ? "Sair" : undefined}
             >
               Sair
             </Button>
           )}
         </div>
       </aside>
+
       <nav
         className="mb-6 flex gap-1 overflow-x-auto border-b pb-2 md:hidden"
         aria-label="Navegação principal"
@@ -149,9 +202,11 @@ export function Sidebar({
             label={label}
             activeTab={activeTab}
             onTabChange={onTabChange}
+            collapsed={false}
           />
         ))}
       </nav>
+
       {email && (
         <div className="mb-6 flex items-center justify-between border-b pb-4 md:hidden">
           <span className="max-w-[70%] truncate text-xs text-muted-foreground">
@@ -177,24 +232,40 @@ function NavItem({
   activeTab,
   onTabChange,
   count,
+  collapsed = false,
 }: {
   tab: DashboardTab
   label: string
   activeTab: DashboardTab
   onTabChange: (tab: DashboardTab) => void
   count?: number
+  collapsed?: boolean
 }) {
+  const icon = tabIcons[tab]
+
   return (
     <button
       type="button"
       onClick={() => onTabChange(tab)}
-      className={`rounded-md px-3 py-2 text-left text-sm transition ${activeTab === tab ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
+      title={collapsed ? label : undefined}
+      className={`flex items-center rounded-md py-2 text-left text-sm transition ${activeTab === tab ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"} ${collapsed ? "w-full justify-center px-2" : "w-full justify-between px-3"}`}
     >
-      <span>{label}</span>
-      {count !== undefined && (
-        <span className="float-right text-xs text-muted-foreground">
-          {count}
-        </span>
+      <span
+        className={`flex items-center ${collapsed ? "justify-center" : "gap-2"}`}
+      >
+        <HugeiconsIcon
+          icon={icon}
+          size={collapsed ? 16 : 18}
+          strokeWidth={1.8}
+          className="shrink-0"
+        />
+        {!collapsed && <span>{label}</span>}
+      </span>
+      {!collapsed && count !== undefined && (
+        <span className="text-xs text-muted-foreground">{count}</span>
+      )}
+      {!collapsed && count === undefined && tab === "excalidraw" && (
+        <span className="sr-only">{label}</span>
       )}
     </button>
   )
@@ -214,13 +285,21 @@ export function PageHeader({
   fileInput: ReactNode
 }) {
   const title =
-    tab === "problems" ? "Problemas" : tab === "todo" ? "A fazer" : "Revisão"
+    tab === "problems"
+      ? "Problemas"
+      : tab === "todo"
+        ? "A fazer"
+        : tab === "review"
+          ? "Revisão"
+          : "Excalidraw"
   const description =
     tab === "problems"
       ? "Seu histórico de prática"
       : tab === "todo"
         ? "Problemas que você quer resolver em seguida"
-        : "Problemas marcados para revisar"
+        : tab === "review"
+          ? "Problemas marcados para revisar"
+          : "Quadro de ideias e diagramas"
   return (
     <header className="mb-7 flex items-center justify-between gap-4">
       <div>
@@ -264,9 +343,12 @@ export function Stats({ problems }: { problems: Problem[] }) {
     ],
   ]
   return (
-    <section className="mb-8 grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
+    <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
       {items.map(([label, value, color]) => (
-        <div key={String(label)} className="px-3">
+        <div
+          key={String(label)}
+          className="rounded-lg border border-border/70 bg-muted/30 px-3 py-3"
+        >
           <div className="text-xs font-medium text-muted-foreground">
             {label}
           </div>
@@ -451,6 +533,17 @@ export function ProblemFilters({
     Dispatch<SetStateAction<string>>,
   ][] = [
     [
+      "Ordenar por",
+      [
+        ["recent_desc", "Mais recentes"],
+        ["recent_asc", "Mais antigos"],
+        ["difficulty", "Dificuldade"],
+        ["title", "Nome (A-Z)"],
+      ],
+      sort,
+      setSort,
+    ],
+    [
       "Dificuldade",
       [
         ["all", "Todas"],
@@ -482,16 +575,6 @@ export function ProblemFilters({
           placeholder="Buscar por nome ou tag"
           className="w-full lg:max-w-sm"
         />
-        <select
-          value={sort}
-          onChange={(event) => setSort(event.target.value)}
-          className="rounded-md border bg-background px-3 py-2 text-sm sm:ml-auto"
-        >
-          <option value="recent_desc">Mais recentes</option>
-          <option value="recent_asc">Mais antigos</option>
-          <option value="difficulty">Dificuldade</option>
-          <option value="title">Nome (A-Z)</option>
-        </select>
         <div className="flex items-center gap-3 text-sm text-muted-foreground lg:ml-auto">
           <span>
             {count} {count === 1 ? "problema" : "problemas"}
@@ -508,22 +591,25 @@ export function ProblemFilters({
           )}
         </div>
       </div>
-      <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+      <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-start">
         {groups.map(([label, options, selected, setter]) => (
-          <div key={label} className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-sm font-medium text-foreground">
-              {label}
-            </span>
-            {options.map(([value, text]) => (
-              <button
-                type="button"
-                key={value}
-                onClick={() => setter(value)}
-                className={`rounded-md border px-3 py-1.5 text-xs transition ${selected === value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-              >
-                {text}
-              </button>
-            ))}
+          <div
+            key={label}
+            className="flex min-w-0 flex-1 flex-col gap-2 border-b border-border/70 pb-3 last:border-b-0 last:pb-0 sm:border-r sm:border-b-0 sm:pr-6 sm:last:border-r-0 sm:last:pr-0"
+          >
+            <span className="text-sm font-medium text-foreground">{label}</span>
+            <div className="flex flex-wrap gap-1.5">
+              {options.map(([value, text]) => (
+                <button
+                  type="button"
+                  key={value}
+                  onClick={() => setter(value)}
+                  className={`rounded-md border px-3 py-1.5 text-xs transition ${selected === value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
           </div>
         ))}
       </div>

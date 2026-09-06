@@ -9,16 +9,21 @@ import {
 } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   PageHeader,
-  ProblemFilters,
-  ProblemTable,
   Sidebar,
   Stats,
-  TodoPanel,
   type DashboardTab,
 } from "@/components/dashboard"
+import { ExcalidrawTab } from "@/components/tabs/excalidraw-tab"
+import { ProblemsTab } from "@/components/tabs/problems-tab"
+import { ReviewTab } from "@/components/tabs/review-tab"
+import { TodoTab } from "@/components/tabs/todo-tab"
 import {
   firebaseEnabled,
   signInWithGoogle,
@@ -74,6 +79,7 @@ const tags = [
   "Recursion",
   "Trie",
 ]
+
 const difficultyLabel: Record<Difficulty, string> = {
   facil: "Fácil",
   medio: "Médio",
@@ -165,6 +171,7 @@ export function App() {
   const [bulk, setBulk] = useState(false)
   const [bulkText, setBulkText] = useState("")
   const [activeTab, setActiveTab] = useState<DashboardTab>("problems")
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(
@@ -469,72 +476,73 @@ export function App() {
 
   return (
     <main className="min-h-screen bg-background px-4 py-6 text-foreground sm:px-8 sm:py-10">
-      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl gap-8">
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          todoCount={todos.length}
-          reviewCount={problems.filter((problem) => problem.revisit).length}
-          email={user?.email}
-          onSignOut={() => void signOutUser()}
-        />
-        <div className="min-w-0 flex-1">
-          <PageHeader
-            tab={activeTab}
-            onImport={() => fileRef.current?.click()}
-            onExport={exportData}
-            onNew={() => openNew()}
-            fileInput={
-              <input
-                ref={fileRef}
-                hidden
-                type="file"
-                accept="application/json"
-                onChange={importData}
-              />
-            }
+      <div className="mx-auto min-h-[calc(100vh-5rem)] gap-8">
+        <div className="hidden md:block">
+          <Sidebar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            todoCount={todos.length}
+            reviewCount={problems.filter((problem) => problem.revisit).length}
+            email={user?.email}
+            onSignOut={() => void signOutUser()}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
           />
+        </div>
+        <div
+          className="min-w-0 flex-1"
+          style={{ marginLeft: sidebarCollapsed ? 72 : 224 }}
+        >
+          {activeTab !== "excalidraw" && (
+            <PageHeader
+              tab={activeTab}
+              onImport={() => fileRef.current?.click()}
+              onExport={exportData}
+              onNew={() => openNew()}
+              fileInput={
+                <input
+                  ref={fileRef}
+                  hidden
+                  type="file"
+                  accept="application/json"
+                  onChange={importData}
+                />
+              }
+            />
+          )}
           {activeTab === "problems" && <Stats problems={problems} />}
           {activeTab === "todo" && (
-            <TodoPanel
+            <TodoTab
               todos={todos}
               bulk={bulk}
               bulkText={bulkText}
               setBulk={setBulk}
               setBulkText={setBulkText}
-              onAdd={addTodo}
-              onBulk={addBulk}
-              onRemove={(id) => void removeTodo(id)}
-              onTry={(todo) => {
-                openNew({ url: todo.url, title: todo.title }, todo.id)
-              }}
+              addTodo={addTodo}
+              addBulk={addBulk}
+              removeTodo={removeTodo}
+              openNew={openNew}
             />
           )}
           {activeTab === "problems" && (
-            <>
-              <ProblemFilters
-                search={search}
-                setSearch={setSearch}
-                sort={sort}
-                setSort={setSort}
-                difficulty={difficulty}
-                setDifficulty={setDifficulty}
-                status={status}
-                setStatus={setStatus}
-                count={visible.length}
-                hasFilters={hasFilters}
-                clearFilters={clearFilters}
-              />
-              <ProblemTable
-                title="Histórico"
-                problems={visible}
-                loading={loading}
-                error={error}
-                onEdit={openEdit}
-                onDelete={setDeleteId}
-                onNotes={setNotesProblem}
-              />
-            </>
+            <ProblemsTab
+              loading={loading}
+              error={error}
+              visible={visible}
+              search={search}
+              setSearch={setSearch}
+              sort={sort}
+              setSort={setSort}
+              difficulty={difficulty}
+              setDifficulty={setDifficulty}
+              status={status}
+              setStatus={setStatus}
+              hasFilters={hasFilters}
+              clearFilters={clearFilters}
+              openEdit={openEdit}
+              setDeleteId={setDeleteId}
+              setNotesProblem={setNotesProblem}
+            />
           )}
           {false && activeTab === "problems" && (
             <>
@@ -748,14 +756,14 @@ export function App() {
             </>
           )}
           {activeTab === "review" && (
-            <ProblemTable
-              title="Revisão"
-              problems={problems.filter((problem) => problem.revisit)}
-              onEdit={openEdit}
-              onDelete={setDeleteId}
-              onNotes={setNotesProblem}
+            <ReviewTab
+              problems={problems}
+              openEdit={openEdit}
+              setDeleteId={setDeleteId}
+              setNotesProblem={setNotesProblem}
             />
           )}
+          {activeTab === "excalidraw" && <ExcalidrawTab />}
           {false && activeTab === "review" && (
             <section className="overflow-hidden rounded-xl border bg-card">
               <div className="overflow-x-auto">
@@ -850,16 +858,11 @@ export function App() {
               )}
             </section>
           )}
-          <footer className="mt-8 text-center text-xs text-muted-foreground">
-            {firebaseEnabled
-              ? "dados sincronizados com o Firestore"
-              : "dados salvos localmente · configure o Firebase para sincronizar"}
-          </footer>
         </div>
       </div>
       {formOpen && (
         <Modal onClose={closeForm}>
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
+          <Card className="dashboard-scrollbar max-h-[90vh] w-full max-w-lg overflow-y-auto">
             <CardHeader>
               <CardTitle>
                 {editingId ? "Editar problema" : "Novo problema"}
@@ -867,107 +870,143 @@ export function App() {
             </CardHeader>
             <CardContent>
               <form onSubmit={submitProblem} className="space-y-4">
-                <label className="block text-sm font-medium">
-                  URL do problema *
+                <div className="space-y-2">
+                  <Label htmlFor="problem-url">URL do problema *</Label>
                   <Input
+                    id="problem-url"
                     required
                     type="url"
                     value={form.url}
                     onChange={(event) => updateForm("url", event.target.value)}
                     placeholder="https://leetcode.com/problems/two-sum/"
-                    className="mt-1"
                   />
-                </label>
-                <label className="block text-sm font-medium">
-                  Nome do problema
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="problem-title">Nome do problema</Label>
                   <Input
+                    id="problem-title"
                     value={form.title}
                     onChange={(event) => updateTitle(event.target.value)}
-                    className="mt-1"
                   />
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <label className="text-sm font-medium">
-                    Dificuldade
-                    <select
-                      value={form.difficulty}
-                      onChange={(event) =>
-                        updateForm(
-                          "difficulty",
-                          event.target.value as Difficulty
-                        )
-                      }
-                      className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="facil">Fácil</option>
-                      <option value="medio">Médio</option>
-                      <option value="dificil">Difícil</option>
-                    </select>
-                  </label>
-                  <label className="text-sm font-medium">
-                    Resultado
-                    <select
-                      value={form.status}
-                      onChange={(event) =>
-                        updateForm(
-                          "status",
-                          event.target.value as ProblemStatus
-                        )
-                      }
-                      className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="resolvido">Resolvido</option>
-                      <option value="ajuda">Precisei de ajuda</option>
-                      <option value="nao_resolvido">
-                        Não consegui resolver
-                      </option>
-                    </select>
-                  </label>
                 </div>
-                <label className="block text-sm font-medium">
-                  Anotações
-                  <textarea
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
+                  <div className="space-y-2">
+                    <Label>Dificuldade</Label>
+                    <ToggleGroup
+                      value={[form.difficulty]}
+                      onValueChange={(values) => {
+                        const value = values[0]
+                        if (value) updateForm("difficulty", value as Difficulty)
+                      }}
+                      className="grid w-full grid-cols-3 gap-1.5"
+                    >
+                      <ToggleGroupItem
+                        value="facil"
+                        variant="outline"
+                        size="sm"
+                        className="w-full min-w-0 px-2 text-xs aria-pressed:border-emerald-500 aria-pressed:bg-emerald-500/15 aria-pressed:text-emerald-700 dark:aria-pressed:text-emerald-300"
+                      >
+                        Fácil
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="medio"
+                        variant="outline"
+                        size="sm"
+                        className="w-full min-w-0 px-2 text-xs aria-pressed:border-amber-500 aria-pressed:bg-amber-500/15 aria-pressed:text-amber-700 dark:aria-pressed:text-amber-300"
+                      >
+                        Médio
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="dificil"
+                        variant="outline"
+                        size="sm"
+                        className="w-full min-w-0 px-2 text-xs aria-pressed:border-red-500 aria-pressed:bg-red-500/15 aria-pressed:text-red-700 dark:aria-pressed:text-red-300"
+                      >
+                        Difícil
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Resultado</Label>
+                    <ToggleGroup
+                      value={[form.status]}
+                      onValueChange={(values) => {
+                        const value = values[0]
+                        if (value) updateForm("status", value as ProblemStatus)
+                      }}
+                      className="grid w-full grid-cols-1 gap-1.5 sm:grid-cols-3"
+                    >
+                      <ToggleGroupItem
+                        value="resolvido"
+                        variant="outline"
+                        size="sm"
+                        className="w-full min-w-0 px-2 text-xs aria-pressed:border-emerald-500 aria-pressed:bg-emerald-500/15 aria-pressed:text-emerald-700 dark:aria-pressed:text-emerald-300"
+                      >
+                        Resolvido
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="ajuda"
+                        variant="outline"
+                        size="sm"
+                        className="w-full min-w-0 px-2 text-xs aria-pressed:border-amber-500 aria-pressed:bg-amber-500/15 aria-pressed:text-amber-700 dark:aria-pressed:text-amber-300"
+                      >
+                        Precisei de ajuda
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="nao_resolvido"
+                        variant="outline"
+                        size="sm"
+                        className="w-full min-w-0 px-2 text-xs aria-pressed:border-red-500 aria-pressed:bg-red-500/15 aria-pressed:text-red-700 dark:aria-pressed:text-red-300"
+                      >
+                        Não consegui
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="problem-notes">Anotações</Label>
+                  <Textarea
+                    id="problem-notes"
                     value={form.notes}
                     onChange={(event) =>
                       updateForm("notes", event.target.value)
                     }
                     rows={3}
-                    className="mt-1 w-full resize-none rounded-md border bg-background px-3 py-2 text-sm"
                   />
-                </label>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <input
-                    type="checkbox"
+                </div>
+                <Label
+                  htmlFor="problem-revisit"
+                  className="w-fit cursor-pointer rounded-md border border-border bg-muted/30 px-3 py-2 text-sm transition-colors hover:bg-muted has-data-checked:border-primary has-data-checked:bg-primary/20 has-data-checked:ring-2 has-data-checked:ring-primary/30"
+                >
+                  <Checkbox
+                    id="problem-revisit"
                     checked={form.revisit}
-                    onChange={(event) =>
-                      updateForm("revisit", event.target.checked)
+                    onCheckedChange={(checked) =>
+                      updateForm("revisit", checked)
                     }
-                  />{" "}
+                  />
                   Marcar para revisar depois
-                </label>
+                </Label>
                 <div>
-                  <div className="mb-1.5 text-sm font-medium">
-                    Tags / tópicos
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 rounded-md border bg-muted/40 p-2.5">
+                  <Label className="mb-2">Tags / tópicos</Label>
+                  <ToggleGroup
+                    multiple
+                    value={form.tags}
+                    onValueChange={(values) => updateForm("tags", values)}
+                    className="flex w-full flex-wrap gap-1.5 rounded-md border bg-muted/40 p-2.5"
+                  >
                     {tags.map((tag) => (
-                      <button
-                        type="button"
+                      <ToggleGroupItem
                         key={tag}
-                        onClick={() =>
-                          updateForm(
-                            "tags",
-                            form.tags.includes(tag)
-                              ? form.tags.filter((item) => item !== tag)
-                              : [...form.tags, tag]
-                          )
-                        }
-                        className={`rounded-md border px-2.5 py-1 text-xs ${form.tags.includes(tag) ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted"}`}
+                        value={tag}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-md px-2.5 text-xs aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground"
                       >
                         {tag}
-                      </button>
+                      </ToggleGroupItem>
                     ))}
-                  </div>
+                  </ToggleGroup>
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={closeForm}>
