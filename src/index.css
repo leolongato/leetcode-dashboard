@@ -132,8 +132,6 @@
     @apply font-sans;
   }
   body {
-    background:
-      radial-gradient(900px 400px at 15% -10%, #12191a 0%, transparent 65%),
-      #0d0f13;
+    min-height: 100vh;
   }
 }

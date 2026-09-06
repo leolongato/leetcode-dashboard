@@ -11,6 +11,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
+  PageHeader,
+  ProblemFilters,
+  ProblemTable,
+  Sidebar,
+  Stats,
+  TodoPanel,
+  type DashboardTab,
+} from "@/components/dashboard"
+import {
   firebaseEnabled,
   signInWithGoogle,
   signOutUser,
@@ -73,17 +82,17 @@ const difficultyLabel: Record<Difficulty, string> = {
 const statusLabel: Record<ProblemStatus, string> = {
   resolvido: "Resolvido",
   ajuda: "Com ajuda",
-  nao_resolvido: "Não resolvido",
+  nao_resolvido: "Não consegui",
 }
 const difficultyColor: Record<Difficulty, string> = {
-  facil: "text-emerald-300 bg-emerald-950/60",
-  medio: "text-amber-300 bg-amber-950/60",
-  dificil: "text-rose-300 bg-rose-950/60",
+  facil: "border-green-400/30 bg-green-400/10 text-green-400",
+  medio: "border-yellow-400/30 bg-yellow-400/10 text-yellow-400",
+  dificil: "border-red-400/30 bg-red-400/10 text-red-400",
 }
 const statusColor: Record<ProblemStatus, string> = {
-  resolvido: "text-emerald-300 bg-emerald-950/50",
-  ajuda: "text-amber-300 bg-amber-950/50",
-  nao_resolvido: "text-slate-300 bg-slate-800",
+  resolvido: "border-green-400/30 bg-green-400/10 text-green-400",
+  ajuda: "border-yellow-400/30 bg-yellow-400/10 text-yellow-400",
+  nao_resolvido: "border-red-400/30 bg-red-400/10 text-red-400",
 }
 
 function titleFromUrl(url: string) {
@@ -93,6 +102,17 @@ function titleFromUrl(url: string) {
         .replace(/-/g, " ")
         .replace(/\b\w/g, (letter) => letter.toUpperCase())
     : ""
+}
+
+function problemUrlFromTitle(title: string) {
+  const slug = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+  return slug ? `https://leetcode.com/problems/${slug}/` : ""
 }
 
 function emptyInput(): ProblemInput {
@@ -138,11 +158,13 @@ export function App() {
   const [sort, setSort] = useState("recent_desc")
   const [form, setForm] = useState<ProblemInput>(emptyInput())
   const [formOpen, setFormOpen] = useState(false)
+  const [pendingTodoId, setPendingTodoId] = useState<string>()
   const [editingId, setEditingId] = useState<string>()
   const [deleteId, setDeleteId] = useState<string>()
   const [notesProblem, setNotesProblem] = useState<Problem>()
   const [bulk, setBulk] = useState(false)
   const [bulkText, setBulkText] = useState("")
+  const [activeTab, setActiveTab] = useState<DashboardTab>("problems")
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(
@@ -207,14 +229,10 @@ export function App() {
         ),
     [problems, difficulty, status, search, sort]
   )
-  const solved = problems.filter(
-    (problem) => problem.status === "resolvido"
-  ).length
-
   if (firebaseEnabled && !authResolved) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#0d0f13] p-6 text-slate-200">
-        <p className="font-mono text-sm text-slate-400">
+      <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+        <p className="text-sm text-muted-foreground">
           Verificando sua sessão...
         </p>
       </main>
@@ -223,19 +241,19 @@ export function App() {
 
   if (firebaseEnabled && !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#0d0f13] p-6 text-slate-200">
-        <Card className="w-full max-w-sm border-[#2f3540] bg-[#14171d]">
+      <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+        <Card className="w-full max-w-sm">
           <CardHeader>
-            <CardTitle className="font-mono">
+            <CardTitle>
               <span className="text-teal-300">$</span> leetcode-tracker
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-5 text-sm text-slate-400">
+            <p className="mb-5 text-sm text-muted-foreground">
               Entre com sua conta Google para acessar seus problemas.
             </p>
             <Button
-              className="w-full bg-teal-300 font-bold text-slate-950 hover:bg-teal-200"
+              className="w-full"
               onClick={() =>
                 signInWithGoogle().catch((reason: unknown) => {
                   const code =
@@ -259,9 +277,14 @@ export function App() {
     )
   }
 
-  function openNew(prefill?: Partial<ProblemInput>) {
+  function openNew(prefill?: Partial<ProblemInput>, todoId?: string) {
     setEditingId(undefined)
-    setForm({ ...emptyInput(), ...prefill })
+    setPendingTodoId(todoId)
+    const nextForm = { ...emptyInput(), ...prefill }
+    if (!nextForm.url && nextForm.title) {
+      nextForm.url = problemUrlFromTitle(nextForm.title)
+    }
+    setForm(nextForm)
     setFormOpen(true)
   }
   function updateForm<K extends keyof ProblemInput>(
@@ -270,17 +293,37 @@ export function App() {
   ) {
     setForm((current) => ({ ...current, [key]: value }))
   }
+  function updateTitle(title: string) {
+    setForm((current) => ({
+      ...current,
+      title,
+      url:
+        !current.url || current.url === problemUrlFromTitle(current.title)
+          ? problemUrlFromTitle(title)
+          : current.url,
+    }))
+  }
   async function submitProblem(event: FormEvent) {
     event.preventDefault()
     try {
       const item = await saveProblem(
-        { ...form, title: form.title || titleFromUrl(form.url) },
+        {
+          ...form,
+          title: form.title || titleFromUrl(form.url),
+          url: form.url || problemUrlFromTitle(form.title),
+        },
         editingId
       )
       setProblems((current) => [
         ...current.filter((problem) => problem.id !== item.id),
         item,
       ])
+      if (pendingTodoId) {
+        await deleteTodo(pendingTodoId)
+        setTodos((current) =>
+          current.filter((todo) => todo.id !== pendingTodoId)
+        )
+      }
       closeForm()
       setToast("Problema salvo.")
     } catch {
@@ -306,14 +349,27 @@ export function App() {
     const url = String(data.get("url") || "")
     const title = String(data.get("title") || "") || titleFromUrl(url)
     if (!title) return
-    const todo = { id: uid(), url, title, createdAt: Date.now() }
+    const todo = {
+      id: uid(),
+      url: url || problemUrlFromTitle(title),
+      title,
+      createdAt: Date.now(),
+    }
     try {
       await saveTodo(todo)
       setTodos((current) => [...current, todo])
       event.currentTarget.reset()
       setToast("Adicionado à fila.")
-    } catch {
-      setToast("Erro ao adicionar.")
+    } catch (reason: unknown) {
+      const code =
+        reason && typeof reason === "object" && "code" in reason
+          ? String(reason.code)
+          : ""
+      setToast(
+        code === "permission-denied"
+          ? "Firestore recusou a gravação. Publique as regras atualizadas."
+          : "Erro ao adicionar o problema."
+      )
     }
   }
   async function addBulk(event: FormEvent) {
@@ -330,7 +386,12 @@ export function App() {
         const title =
           (right ? left : left.replace(url, "").trim()) || titleFromUrl(url)
         return title
-          ? { id: uid(), url, title, createdAt: Date.now() }
+          ? {
+              id: uid(),
+              url: url || problemUrlFromTitle(title),
+              title,
+              createdAt: Date.now(),
+            }
           : undefined
       })
       .filter(
@@ -393,373 +454,420 @@ export function App() {
   }
   function closeForm() {
     setEditingId(undefined)
+    setPendingTodoId(undefined)
     setForm(emptyInput())
     setFormOpen(false)
   }
 
+  const hasFilters = Boolean(search || difficulty !== "all" || status !== "all")
+  function clearFilters() {
+    setSearch("")
+    setDifficulty("all")
+    setStatus("all")
+    setSort("recent_desc")
+  }
+
   return (
-    <main className="min-h-screen bg-[#0d0f13] px-5 pt-10 pb-20 text-[#e7e9ee] sm:px-8">
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
-          <div>
-            <div className="mb-1 font-mono text-[13px] text-slate-500">
-              ~/pratica <span>/</span>{" "}
-              <span className="text-teal-300">leetcode-tracker</span>
-            </div>
-            <h1 className="font-mono text-2xl font-extrabold tracking-tight sm:text-3xl">
-              <span className="text-teal-300">$</span> registro de problemas
-            </h1>
-            <p className="mt-1.5 text-sm text-slate-400">
-              Cada linha resolvida aqui é uma linha que você não vai esquecer no
-              dia da entrevista.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => fileRef.current?.click()}>
-              Importar
-            </Button>
-            <input
-              ref={fileRef}
-              hidden
-              type="file"
-              accept="application/json"
-              onChange={importData}
-            />
-            <Button variant="outline" onClick={exportData}>
-              Exportar
-            </Button>
-            <Button
-              onClick={() => openNew()}
-              className="bg-teal-300 font-bold text-slate-950 hover:bg-teal-200"
-            >
-              + Novo problema
-            </Button>
-            {user && (
-              <Button variant="ghost" onClick={() => void signOutUser()}>
-                {user.email ?? "Conta Google"} · Sair
-              </Button>
-            )}
-          </div>
-        </header>
-        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            ["Total", problems.length, ""],
-            ["Resolvidos", solved, "text-emerald-300"],
-            [
-              "Taxa de acerto",
-              `${problems.length ? Math.round((solved / problems.length) * 100) : 0}%`,
-              "",
-            ],
-            [
-              "Para revisar",
-              problems.filter((problem) => problem.revisit).length,
-              "text-amber-300",
-            ],
-          ].map(([label, value, color]) => (
-            <Card key={String(label)} className="border-[#262b34] bg-[#14171d]">
-              <CardContent className="p-4">
-                <div className="font-mono text-[11px] tracking-wider text-slate-500 uppercase">
-                  {String(label)}
-                </div>
-                <div className={`mt-1 text-2xl font-bold ${color}`}>
-                  {value}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-        <section className="mb-6 rounded-xl border border-[#262b34] bg-[#14171d] p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-mono text-sm font-bold">
-              <span className="text-teal-300">$</span> para tentar depois
-            </h2>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setBulk((value) => !value)}
-              >
-                Adicionar em lote
-              </Button>
-              <span className="rounded-full border border-[#2f3540] bg-[#191d24] px-2 py-0.5 font-mono text-[11px] text-slate-400">
-                {todos.length}
-              </span>
-            </div>
-          </div>
-          <form onSubmit={addTodo} className="mb-3 flex flex-wrap gap-2">
-            <Input
-              name="url"
-              type="url"
-              placeholder="URL do leetcode (opcional)"
-              className="min-w-[180px] flex-1 border-[#2f3540] bg-[#191d24]"
-            />
-            <Input
-              name="title"
-              placeholder="Nome do problema"
-              className="min-w-[180px] flex-1 border-[#2f3540] bg-[#191d24]"
-            />
-            <Button className="bg-teal-300 text-slate-950 hover:bg-teal-200">
-              Adicionar
-            </Button>
-          </form>
-          {bulk && (
-            <form onSubmit={addBulk} className="mb-3 space-y-2">
-              <textarea
-                value={bulkText}
-                onChange={(event) => setBulkText(event.target.value)}
-                rows={5}
-                placeholder={
-                  "Um problema por linha, ex:\nTrapping Rain Water\nhttps://leetcode.com/problems/word-ladder/"
-                }
-                className="w-full resize-none rounded-lg border border-[#2f3540] bg-[#191d24] px-3 py-2 text-sm outline-none focus:border-teal-300"
+    <main className="min-h-screen bg-background px-4 py-6 text-foreground sm:px-8 sm:py-10">
+      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl gap-8">
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          todoCount={todos.length}
+          reviewCount={problems.filter((problem) => problem.revisit).length}
+          email={user?.email}
+          onSignOut={() => void signOutUser()}
+        />
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            tab={activeTab}
+            onImport={() => fileRef.current?.click()}
+            onExport={exportData}
+            onNew={() => openNew()}
+            fileInput={
+              <input
+                ref={fileRef}
+                hidden
+                type="file"
+                accept="application/json"
+                onChange={importData}
               />
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>Nome, URL ou "Nome | URL".</span>
-                <Button size="sm" className="bg-teal-300 text-slate-950">
-                  Adicionar todos
-                </Button>
-              </div>
-            </form>
-          )}
-          <ul className="space-y-1.5">
-            {todos
-              .slice()
-              .sort((a, b) => a.createdAt - b.createdAt)
-              .map((todo) => (
-                <li
-                  key={todo.id}
-                  className="flex items-center gap-2 rounded-lg border border-[#2f3540] bg-[#191d24] p-2.5"
-                >
-                  <a
-                    href={todo.url || undefined}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="min-w-0 flex-1 truncate text-sm font-medium hover:text-teal-300"
-                  >
-                    {todo.title}
-                  </a>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      void removeTodo(todo.id)
-                      openNew({ url: todo.url, title: todo.title })
-                    }}
-                  >
-                    Tentar agora
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void removeTodo(todo.id)}
-                  >
-                    Remover
-                  </Button>
-                </li>
-              ))}
-          </ul>
-          {!todos.length && (
-            <p className="py-2 text-sm text-slate-500">
-              Nenhum problema na fila. Adicione um acima para tentar depois.
-            </p>
-          )}
-        </section>
-        <section className="mb-4 rounded-xl border border-[#262b34] bg-[#14171d] p-3">
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por nome ou tag..."
-              className="w-full border-[#2f3540] bg-[#191d24] sm:w-72"
+            }
+          />
+          {activeTab === "problems" && <Stats problems={problems} />}
+          {activeTab === "todo" && (
+            <TodoPanel
+              todos={todos}
+              bulk={bulk}
+              bulkText={bulkText}
+              setBulk={setBulk}
+              setBulkText={setBulkText}
+              onAdd={addTodo}
+              onBulk={addBulk}
+              onRemove={(id) => void removeTodo(id)}
+              onTry={(todo) => {
+                openNew({ url: todo.url, title: todo.title }, todo.id)
+              }}
             />
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value)}
-              className="rounded-lg border border-[#2f3540] bg-[#191d24] px-3 py-2 text-sm sm:ml-auto"
-            >
-              <option value="recent_desc">Mais recentes</option>
-              <option value="recent_asc">Mais antigos</option>
-              <option value="difficulty">Dificuldade</option>
-              <option value="title">Nome (A-Z)</option>
-            </select>
-          </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-2">
-            {[
-              [
-                "Dificuldade",
-                [
-                  ["all", "Todas"],
-                  ["facil", "Fácil"],
-                  ["medio", "Médio"],
-                  ["dificil", "Difícil"],
-                ],
-                difficulty,
-                setDifficulty,
-              ],
-              [
-                "Status",
-                [
-                  ["all", "Todos"],
-                  ["resolvido", "Resolvido"],
-                  ["ajuda", "Com ajuda"],
-                  ["nao_resolvido", "Não resolvido"],
-                ],
-                status,
-                setStatus,
-              ],
-            ].map(([label, options, selected, setter]) => (
-              <div
-                key={String(label)}
-                className="flex flex-wrap items-center gap-1.5"
-              >
-                <span className="mr-1 font-mono text-[10px] tracking-wider text-slate-500 uppercase">
-                  {String(label)}
-                </span>
-                {(options as string[][]).map(([value, text]) => (
-                  <button
-                    type="button"
-                    key={value}
-                    onClick={() =>
-                      (setter as React.Dispatch<React.SetStateAction<string>>)(
-                        value
-                      )
-                    }
-                    className={`rounded-full border px-3 py-1.5 text-xs transition ${selected === value ? "border-teal-300 bg-teal-950/70 text-teal-300" : "border-[#2f3540] bg-[#191d24] text-slate-400 hover:text-slate-100"}`}
-                  >
-                    {text}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="overflow-hidden rounded-xl border border-[#262b34] bg-[#14171d]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="text-left font-mono text-[11px] tracking-wider text-slate-500 uppercase">
-                  <th className="px-4 py-3">Problema</th>
-                  <th className="px-4 py-3">Dificuldade</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Tags</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((problem) => (
-                  <tr
-                    key={problem.id}
-                    className="border-t border-[#262b34] hover:bg-[#191d24]"
-                  >
-                    <td className="max-w-xs px-4 py-3">
-                      <a
-                        href={problem.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-medium hover:text-teal-300"
-                      >
-                        {problem.title}
-                      </a>
-                      {problem.revisit && (
-                        <span className="ml-2 rounded bg-teal-950/70 px-1.5 py-0.5 font-mono text-[10px] text-teal-300">
-                          revisar
-                        </span>
-                      )}
-                      {problem.notes && (
-                        <button
-                          onClick={() => setNotesProblem(problem)}
-                          className="block max-w-xs truncate text-left text-xs text-slate-500 hover:text-teal-300"
-                        >
-                          {problem.notes}
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-full px-2 py-1 font-mono text-[11px] font-bold ${difficultyColor[problem.difficulty]}`}
-                      >
-                        {difficultyLabel[problem.difficulty]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-full px-2 py-1 font-mono text-[11px] font-bold ${statusColor[problem.status]}`}
-                      >
-                        ● {statusLabel[problem.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex max-w-[220px] flex-wrap gap-1">
-                        {problem.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded border border-[#2f3540] bg-[#191d24] px-1.5 py-0.5 font-mono text-[11px] text-slate-400"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEdit(problem)}
-                        >
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteId(problem.id)}
-                          className="text-rose-300"
-                        >
-                          Excluir
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {loading ? (
-            <p className="py-16 text-center text-sm text-slate-400">
-              Carregando problemas...
-            </p>
-          ) : error ? (
-            <p className="py-16 text-center text-sm text-rose-300">{error}</p>
-          ) : (
-            !visible.length && (
-              <div className="px-6 py-16 text-center">
-                <div className="font-mono text-sm text-slate-500">
-                  Nenhum problema encontrado
-                </div>
-                <div className="text-sm text-slate-400">
-                  Ajuste os filtros ou adicione seu primeiro problema.
-                </div>
-              </div>
-            )
           )}
-        </section>
-        <footer className="mt-8 text-center font-mono text-[11px] text-slate-500">
-          {firebaseEnabled
-            ? "dados sincronizados com o Firestore"
-            : "dados salvos localmente · configure o Firebase para sincronizar"}
-        </footer>
+          {activeTab === "problems" && (
+            <>
+              <ProblemFilters
+                search={search}
+                setSearch={setSearch}
+                sort={sort}
+                setSort={setSort}
+                difficulty={difficulty}
+                setDifficulty={setDifficulty}
+                status={status}
+                setStatus={setStatus}
+                count={visible.length}
+                hasFilters={hasFilters}
+                clearFilters={clearFilters}
+              />
+              <ProblemTable
+                title="Histórico"
+                problems={visible}
+                loading={loading}
+                error={error}
+                onEdit={openEdit}
+                onDelete={setDeleteId}
+                onNotes={setNotesProblem}
+              />
+            </>
+          )}
+          {false && activeTab === "problems" && (
+            <>
+              <section className="mb-3 rounded-xl border bg-card p-3">
+                <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Buscar por nome ou tag"
+                    className="w-full lg:max-w-sm"
+                  />
+                  <select
+                    value={sort}
+                    onChange={(event) => setSort(event.target.value)}
+                    className="rounded-md border bg-background px-3 py-2 text-sm sm:ml-auto"
+                  >
+                    <option value="recent_desc">Mais recentes</option>
+                    <option value="recent_asc">Mais antigos</option>
+                    <option value="difficulty">Dificuldade</option>
+                    <option value="title">Nome (A-Z)</option>
+                  </select>
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground lg:ml-auto">
+                    <span>
+                      {visible.length}{" "}
+                      {visible.length === 1 ? "problema" : "problemas"}
+                    </span>
+                    {hasFilters && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearFilters}
+                      >
+                        Limpar filtros
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+                  {[
+                    [
+                      "Dificuldade",
+                      [
+                        ["all", "Todas"],
+                        ["facil", "Fácil"],
+                        ["medio", "Médio"],
+                        ["dificil", "Difícil"],
+                      ],
+                      difficulty,
+                      setDifficulty,
+                    ],
+                    [
+                      "Status",
+                      [
+                        ["all", "Todos"],
+                        ["resolvido", "Resolvido"],
+                        ["ajuda", "Com ajuda"],
+                        ["nao_resolvido", "Não resolvido"],
+                      ],
+                      status,
+                      setStatus,
+                    ],
+                  ].map(([label, options, selected, setter]) => (
+                    <div
+                      key={String(label)}
+                      className="flex flex-wrap items-center gap-1.5"
+                    >
+                      <span className="mr-1 text-sm font-medium text-foreground">
+                        {String(label)}
+                      </span>
+                      {(options as string[][]).map(([value, text]) => (
+                        <button
+                          type="button"
+                          key={value}
+                          onClick={() =>
+                            (
+                              setter as React.Dispatch<
+                                React.SetStateAction<string>
+                              >
+                            )(value)
+                          }
+                          className={`rounded-md border px-3 py-1.5 text-xs transition ${selected === value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                        >
+                          {text}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </section>
+              <section className="overflow-hidden rounded-xl border bg-card">
+                <div className="flex items-center justify-between border-b px-4 py-3">
+                  <div>
+                    <h2 className="text-base font-semibold">Histórico</h2>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {visible.length} exibidos
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-sm">
+                    <thead className="bg-muted/40">
+                      <tr className="text-left text-xs font-medium text-muted-foreground">
+                        <th className="px-5 py-3">Problema</th>
+                        <th className="px-5 py-3">Dificuldade</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3">Tópico</th>
+                        <th className="px-5 py-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visible.map((problem) => (
+                        <tr
+                          key={problem.id}
+                          className="border-t hover:bg-muted/50"
+                        >
+                          <td className="max-w-xs px-5 py-4">
+                            <a
+                              href={problem.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium hover:text-primary"
+                            >
+                              {problem.title}
+                            </a>
+                            {problem.revisit && (
+                              <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                revisar
+                              </span>
+                            )}
+                            {problem.notes && (
+                              <button
+                                onClick={() => setNotesProblem(problem)}
+                                className="block max-w-xs truncate text-left text-xs text-muted-foreground hover:text-primary"
+                              >
+                                {problem.notes}
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex min-h-6 items-center rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${difficultyColor[problem.difficulty]}`}
+                            >
+                              {difficultyLabel[problem.difficulty]}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex min-h-6 min-w-[6.5rem] items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${statusColor[problem.status]}`}
+                            >
+                              ● {statusLabel[problem.status]}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex max-w-[220px] flex-wrap gap-1">
+                              {problem.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="rounded border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end gap-1.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEdit(problem)}
+                              >
+                                Editar
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteId(problem.id)}
+                                className="text-destructive"
+                              >
+                                Excluir
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {loading ? (
+                  <p className="py-16 text-center text-sm text-muted-foreground">
+                    Carregando problemas...
+                  </p>
+                ) : error ? (
+                  <p className="py-16 text-center text-sm text-destructive">
+                    {error}
+                  </p>
+                ) : (
+                  !visible.length && (
+                    <div className="px-6 py-16 text-center">
+                      <div className="text-sm font-medium text-foreground">
+                        Nenhum problema encontrado
+                      </div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        Ajuste os filtros ou adicione seu primeiro problema.
+                      </div>
+                    </div>
+                  )
+                )}
+              </section>
+            </>
+          )}
+          {activeTab === "review" && (
+            <ProblemTable
+              title="Revisão"
+              problems={problems.filter((problem) => problem.revisit)}
+              onEdit={openEdit}
+              onDelete={setDeleteId}
+              onNotes={setNotesProblem}
+            />
+          )}
+          {false && activeTab === "review" && (
+            <section className="overflow-hidden rounded-xl border bg-card">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[680px] text-sm">
+                  <thead className="bg-muted/40">
+                    <tr className="text-left text-xs font-medium text-muted-foreground">
+                      <th className="px-5 py-3">Problema</th>
+                      <th className="px-5 py-3">Dificuldade</th>
+                      <th className="px-5 py-3">Status</th>
+                      <th className="px-5 py-3">Tópico</th>
+                      <th className="px-5 py-3 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {problems
+                      .filter((problem) => problem.revisit)
+                      .map((problem) => (
+                        <tr
+                          key={problem.id}
+                          className="border-t hover:bg-muted/50"
+                        >
+                          <td className="px-5 py-4">
+                            <a
+                              href={problem.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium hover:text-primary"
+                            >
+                              {problem.title}
+                            </a>
+                            {problem.notes && (
+                              <button
+                                onClick={() => setNotesProblem(problem)}
+                                className="block max-w-xs truncate text-left text-xs text-muted-foreground hover:text-primary"
+                              >
+                                {problem.notes}
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`rounded-full px-2 py-1 text-xs font-medium ${difficultyColor[problem.difficulty]}`}
+                            >
+                              {difficultyLabel[problem.difficulty]}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`rounded-full px-2 py-1 text-xs font-medium ${statusColor[problem.status]}`}
+                            >
+                              {statusLabel[problem.status]}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex max-w-[220px] flex-wrap gap-1">
+                              {problem.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="rounded border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEdit(problem)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => setDeleteId(problem.id)}
+                            >
+                              Excluir
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              {!problems.some((problem) => problem.revisit) && (
+                <div className="px-6 py-16 text-center text-sm text-muted-foreground">
+                  Nenhum problema marcado para revisão.
+                </div>
+              )}
+            </section>
+          )}
+          <footer className="mt-8 text-center text-xs text-muted-foreground">
+            {firebaseEnabled
+              ? "dados sincronizados com o Firestore"
+              : "dados salvos localmente · configure o Firebase para sincronizar"}
+          </footer>
+        </div>
       </div>
       {formOpen && (
         <Modal onClose={closeForm}>
-          <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto border-[#2f3540] bg-[#14171d]">
+          <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
             <CardHeader>
-              <CardTitle className="font-mono">
+              <CardTitle>
                 {editingId ? "Editar problema" : "Novo problema"}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={submitProblem} className="space-y-4">
-                <label className="block text-xs text-slate-400">
+                <label className="block text-sm font-medium">
                   URL do problema *
                   <Input
                     required
@@ -767,21 +875,19 @@ export function App() {
                     value={form.url}
                     onChange={(event) => updateForm("url", event.target.value)}
                     placeholder="https://leetcode.com/problems/two-sum/"
-                    className="mt-1 border-[#2f3540] bg-[#191d24]"
+                    className="mt-1"
                   />
                 </label>
-                <label className="block text-xs text-slate-400">
+                <label className="block text-sm font-medium">
                   Nome do problema
                   <Input
                     value={form.title}
-                    onChange={(event) =>
-                      updateForm("title", event.target.value)
-                    }
-                    className="mt-1 border-[#2f3540] bg-[#191d24]"
+                    onChange={(event) => updateTitle(event.target.value)}
+                    className="mt-1"
                   />
                 </label>
                 <div className="grid grid-cols-2 gap-4">
-                  <label className="text-xs text-slate-400">
+                  <label className="text-sm font-medium">
                     Dificuldade
                     <select
                       value={form.difficulty}
@@ -791,14 +897,14 @@ export function App() {
                           event.target.value as Difficulty
                         )
                       }
-                      className="mt-1 w-full rounded-lg border border-[#2f3540] bg-[#191d24] px-3 py-2 text-sm"
+                      className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
                     >
                       <option value="facil">Fácil</option>
                       <option value="medio">Médio</option>
                       <option value="dificil">Difícil</option>
                     </select>
                   </label>
-                  <label className="text-xs text-slate-400">
+                  <label className="text-sm font-medium">
                     Resultado
                     <select
                       value={form.status}
@@ -808,7 +914,7 @@ export function App() {
                           event.target.value as ProblemStatus
                         )
                       }
-                      className="mt-1 w-full rounded-lg border border-[#2f3540] bg-[#191d24] px-3 py-2 text-sm"
+                      className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
                     >
                       <option value="resolvido">Resolvido</option>
                       <option value="ajuda">Precisei de ajuda</option>
@@ -818,7 +924,7 @@ export function App() {
                     </select>
                   </label>
                 </div>
-                <label className="block text-xs text-slate-400">
+                <label className="block text-sm font-medium">
                   Anotações
                   <textarea
                     value={form.notes}
@@ -826,10 +932,10 @@ export function App() {
                       updateForm("notes", event.target.value)
                     }
                     rows={3}
-                    className="mt-1 w-full resize-none rounded-lg border border-[#2f3540] bg-[#191d24] px-3 py-2 text-sm"
+                    className="mt-1 w-full resize-none rounded-md border bg-background px-3 py-2 text-sm"
                   />
                 </label>
-                <label className="flex items-center gap-2 text-sm text-slate-400">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
                   <input
                     type="checkbox"
                     checked={form.revisit}
@@ -840,10 +946,10 @@ export function App() {
                   Marcar para revisar depois
                 </label>
                 <div>
-                  <div className="mb-1.5 text-xs text-slate-400">
+                  <div className="mb-1.5 text-sm font-medium">
                     Tags / tópicos
                   </div>
-                  <div className="flex flex-wrap gap-1.5 rounded-lg border border-[#2f3540] bg-[#191d24] p-2.5">
+                  <div className="flex flex-wrap gap-1.5 rounded-md border bg-muted/40 p-2.5">
                     {tags.map((tag) => (
                       <button
                         type="button"
@@ -856,7 +962,7 @@ export function App() {
                               : [...form.tags, tag]
                           )
                         }
-                        className={`rounded-full border px-2.5 py-1 font-mono text-xs ${form.tags.includes(tag) ? "border-teal-300 bg-teal-300 text-slate-950" : "border-[#2f3540] text-slate-400"}`}
+                        className={`rounded-md border px-2.5 py-1 text-xs ${form.tags.includes(tag) ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted"}`}
                       >
                         {tag}
                       </button>
@@ -867,9 +973,7 @@ export function App() {
                   <Button type="button" variant="outline" onClick={closeForm}>
                     Cancelar
                   </Button>
-                  <Button className="bg-teal-300 text-slate-950 hover:bg-teal-200">
-                    Salvar
-                  </Button>
+                  <Button type="submit">Salvar</Button>
                 </div>
               </form>
             </CardContent>
@@ -878,19 +982,16 @@ export function App() {
       )}
       {deleteId && (
         <Modal onClose={() => setDeleteId(undefined)}>
-          <Card className="w-full max-w-sm border-[#2f3540] bg-[#14171d] p-6">
-            <h2 className="font-mono font-bold">Remover problema?</h2>
-            <p className="my-4 text-sm text-slate-400">
+          <Card className="w-full max-w-sm p-6">
+            <h2 className="font-semibold">Remover problema?</h2>
+            <p className="my-4 text-sm text-muted-foreground">
               Essa ação não pode ser desfeita.
             </p>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setDeleteId(undefined)}>
                 Cancelar
               </Button>
-              <Button
-                onClick={() => void removeProblem()}
-                className="bg-rose-400 text-rose-950 hover:bg-rose-300"
-              >
+              <Button onClick={() => void removeProblem()} className="">
                 Remover
               </Button>
             </div>
@@ -899,8 +1000,8 @@ export function App() {
       )}
       {notesProblem && (
         <Modal onClose={() => setNotesProblem(undefined)}>
-          <Card className="w-full max-w-lg border-[#2f3540] bg-[#14171d] p-6">
-            <div className="font-mono text-[11px] text-slate-500 uppercase">
+          <Card className="w-full max-w-lg p-6">
+            <div className="text-xs font-medium text-muted-foreground">
               Anotação
             </div>
             <h2 className="mt-1 font-semibold">{notesProblem.title}</h2>
@@ -917,10 +1018,7 @@ export function App() {
               >
                 Editar problema
               </Button>
-              <Button
-                onClick={() => setNotesProblem(undefined)}
-                className="bg-teal-300 text-slate-950"
-              >
+              <Button onClick={() => setNotesProblem(undefined)} className="">
                 Fechar
               </Button>
             </div>
@@ -928,7 +1026,7 @@ export function App() {
         </Modal>
       )}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-lg border border-[#2f3540] bg-[#191d24] px-4 py-2.5 font-mono text-sm">
+        <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-md border bg-popover px-4 py-2.5 text-sm shadow-lg">
           {toast}
         </div>
       )}

@@ -13,7 +13,8 @@ import type { Problem, ProblemInput, Todo } from "@/types"
 const problemKey = "lc_tracker_problems_v1"
 const todoKey = "lc_tracker_todos_v1"
 
-function currentUserId() {
+async function currentUserId() {
+  if (auth) await auth.authStateReady()
   const userId = auth?.currentUser?.uid
   if (!userId) throw new Error("Usuário não autenticado.")
   return userId
@@ -34,8 +35,9 @@ function localWrite<T>(key: string, value: T[]) {
 
 export async function getProblems() {
   if (!db) return localRead<Problem>(problemKey)
+  const userId = await currentUserId()
   const snapshot = await getDocs(
-    query(collection(db, "problems"), where("userId", "==", currentUserId()))
+    query(collection(db, "problems"), where("userId", "==", userId))
   )
   return snapshot.docs.map(
     (item) => ({ id: item.id, ...item.data() }) as Problem
@@ -44,11 +46,12 @@ export async function getProblems() {
 
 export async function saveProblem(input: ProblemInput, id?: string) {
   const { createdAt, ...data } = input
+  const userId = db ? await currentUserId() : undefined
   const problem: Problem = {
     ...data,
     id: id ?? uid(),
     createdAt: createdAt ?? Date.now(),
-    userId: db ? currentUserId() : undefined,
+    userId,
   }
   if (db) {
     await setDoc(doc(db, "problems", problem.id), problem)
@@ -74,8 +77,9 @@ export async function deleteProblem(id: string) {
 
 export async function getTodos() {
   if (!db) return localRead<Todo>(todoKey)
+  const userId = await currentUserId()
   const snapshot = await getDocs(
-    query(collection(db, "todos"), where("userId", "==", currentUserId()))
+    query(collection(db, "todos"), where("userId", "==", userId))
   )
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Todo)
 }
@@ -84,7 +88,7 @@ export async function saveTodo(todo: Todo) {
   if (db) {
     await setDoc(doc(db, "todos", todo.id), {
       ...todo,
-      userId: currentUserId(),
+      userId: await currentUserId(),
     })
   } else
     localWrite(todoKey, [
