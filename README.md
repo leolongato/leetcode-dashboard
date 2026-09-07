@@ -1,77 +1,77 @@
 # LC Tracker
 
-Dashboard pessoal para acompanhar a prática de problemas do LeetCode. O app centraliza o histórico de exercícios, permite registrar o resultado de cada tentativa e cria uma fila de problemas para resolver depois.
+A personal dashboard for tracking LeetCode practice. The app centralizes your problem history, lets you record the outcome of each attempt, and maintains a queue of problems to solve next.
 
-O projeto foi construído com React, TypeScript, Vite, Tailwind CSS, componentes próprios inspirados no shadcn/ui e Excalidraw.
+The project is built with React, TypeScript, Vite, Tailwind CSS, custom components inspired by shadcn/ui, and Excalidraw.
 
-## Funcionalidades
+## Features
 
-### Problemas
+### Problems
 
-- Cadastro de problemas por URL ou título.
-- Preenchimento automático do título a partir de URLs do LeetCode.
-- Classificação por dificuldade: fácil, médio ou difícil.
-- Registro do resultado: resolvido, com ajuda ou não resolvido.
-- Tags de assuntos, como Array, Graph, Dynamic Programming e Binary Search.
-- Anotações e marcação para revisão posterior.
-- Busca por título ou tags.
-- Filtros por dificuldade e status.
-- Ordenação por data, dificuldade ou título.
-- Edição, exclusão e visualização das anotações.
-- Indicadores de problemas resolvidos, problemas com ajuda, problemas não resolvidos e taxa de acerto.
+- Add problems using a URL or title.
+- Automatically fill in the title from LeetCode URLs.
+- Classify problems as easy, medium, or hard.
+- Record the result as solved, solved with help, or not solved.
+- Add topic tags such as Array, Graph, Dynamic Programming, and Binary Search.
+- Add notes and mark problems for later review.
+- Search by title or tags.
+- Filter by difficulty and status.
+- Sort by date, difficulty, or title.
+- Edit, delete, and view problem notes.
+- Track solved problems, problems solved with help, unsolved problems, and success rate.
 
-### A fazer
+### To-do
 
-Mantenha uma fila de problemas que você pretende resolver. É possível adicionar itens individualmente, importar vários títulos de uma vez e transformar um item da fila em um problema registrado.
+Maintain a queue of problems you want to solve. You can add items individually, import multiple titles at once, and turn a queued item into a recorded problem.
 
-### Revisão
+### Review
 
-Exibe somente os problemas marcados com a opção de revisão, facilitando revisitar exercícios importantes ou que ainda precisam de prática.
+Displays only the problems marked for review, making it easier to revisit important exercises or topics that need more practice.
 
-### Desenhar
+### Draw
 
-Abre um quadro Excalidraw para rascunhar algoritmos, estruturas de dados, fluxos e ideias durante os estudos.
+Opens an Excalidraw canvas for sketching algorithms, data structures, flows, and study ideas.
 
-### Importação e exportação
+### Import and export
 
-Na aba de problemas, use os controles de importação e exportação para transportar seus registros em formato JSON entre ambientes ou manter um backup local.
+Use the import and export controls in the Problems tab to move your records between environments or create a local JSON backup.
 
-## Persistência dos dados
+## Data persistence
 
-O app possui dois modos de funcionamento:
+The app supports two modes:
 
-- **Sem Firebase:** os dados são salvos no `localStorage` do navegador. Esse modo funciona imediatamente para desenvolvimento e uso local, mas os dados ficam restritos ao navegador e ao dispositivo atual.
-- **Com Firebase:** quando todas as variáveis de ambiente estão configuradas, o app usa autenticação Google e Cloud Firestore. Cada usuário acessa apenas os próprios problemas e itens da fila.
+- **Without Firebase:** data is stored in the browser's `localStorage`. This works immediately for local development and personal use, but the data remains limited to the current browser and device.
+- **With Firebase:** when all environment variables are configured, the app uses Google Authentication and Cloud Firestore. Each user can access only their own problems and to-do items.
 
-## Requisitos
+## Requirements
 
-- Node.js 22 ou superior recomendado.
+- Node.js 22 or newer is recommended.
 - npm.
-- Uma conta Google e um projeto Firebase apenas se você quiser persistência na nuvem e autenticação.
+- A Google account and Firebase project only if you want cloud persistence and authentication.
 
-## Instalação e uso local
+## Local setup
 
-Clone o repositório, instale as dependências e inicie o servidor de desenvolvimento:
+Clone the repository, install the dependencies, and start the development server:
 
 ```bash
-git clone https://github.com/SEU_USUARIO/leetcode-dashboard.git
+git clone https://github.com/leolongato/leetcode-dashboard.git
 cd leetcode-dashboard
 npm install
 npm run dev
 ```
 
-O Vite exibirá o endereço local no terminal, normalmente `http://localhost:5173`.
+Vite will display the local address in the terminal, usually `http://localhost:5173`.
 
-### Configuração opcional do Firebase
+### Optional Firebase setup
 
-Sem essa configuração, o app usa `localStorage`. Para ativar login Google e Firestore:
+Without this configuration, the app uses `localStorage`. To enable Google sign-in and Firestore:
 
-1. Crie um projeto no [Firebase Console](https://console.firebase.google.com/).
-2. Registre uma aplicação Web e copie as credenciais exibidas.
-3. Ative o provedor **Google** em **Authentication → Sign-in method**.
-4. Crie um banco **Cloud Firestore**.
-5. Publique as regras do arquivo [`firestore.rules`](firestore.rules).
-6. Crie um arquivo `.env.local` na raiz, baseado em [`.env.example`](.env.example):
+1. Create a project in the [Firebase Console](https://console.firebase.google.com/).
+2. Register a Web app and copy the displayed credentials.
+3. Enable the **Google** provider under **Authentication → Sign-in method**.
+4. Create a **Cloud Firestore** database.
+5. Publish the rules from [`firestore.rules`](firestore.rules).
+6. Create a `.env.local` file in the project root based on [`.env.example`](.env.example):
 
 ```env
 VITE_FIREBASE_API_KEY=...
@@ -82,45 +82,45 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 ```
 
-Reinicie o Vite depois de criar ou alterar o arquivo de ambiente. O arquivo `.env.local` não deve ser commitado.
+Restart Vite after creating or changing the environment file. Do not commit `.env.local`.
 
-Para testar o login em produção, adicione o domínio do site publicado em **Authentication → Settings → Authorized domains** no Firebase.
+To test sign-in in production, add the published site's domain under **Authentication → Settings → Authorized domains** in Firebase.
 
-## Scripts disponíveis
+## Available scripts
 
 ```bash
-npm run dev       # inicia o servidor de desenvolvimento
-npm run build     # verifica os tipos e gera dist/
-npm run preview   # serve o build localmente
-npm run lint      # executa o ESLint
-npm run typecheck # executa apenas a verificação TypeScript
-npm run format    # formata arquivos TypeScript
+npm run dev       # start the development server
+npm run build     # check types and generate dist/
+npm run preview   # serve the production build locally
+npm run lint      # run ESLint
+npm run typecheck # run the TypeScript check only
+npm run format    # format TypeScript files
 ```
 
-Antes de publicar, valide o projeto com:
+Before publishing, validate the project with:
 
 ```bash
 npm run lint
 npm run build
 ```
 
-## Publicação no GitHub Pages
+## GitHub Pages deployment
 
-O workflow [`deploy.yml`](.github/workflows/deploy.yml) publica automaticamente a aplicação a cada push na branch `main`.
+The [`deploy.yml`](.github/workflows/deploy.yml) workflow automatically publishes the app whenever code is pushed to the `main` branch.
 
-1. Crie um repositório no GitHub chamado `leetcode-dashboard` e envie o código para a branch `main`.
-2. No repositório, abra **Settings → Pages**.
-3. Em **Build and deployment → Source**, selecione **GitHub Actions**.
-4. Em **Settings → Secrets and variables → Actions**, adicione estes secrets caso o Firebase esteja configurado:
+1. Create a GitHub repository named `leetcode-dashboard` and push the code to the `main` branch.
+2. In the repository, open **Settings → Pages**.
+3. Under **Build and deployment → Source**, select **GitHub Actions**.
+4. Under **Settings → Secrets and variables → Actions**, add these repository secrets if Firebase is configured:
 
-	- `VITE_FIREBASE_API_KEY`
-	- `VITE_FIREBASE_AUTH_DOMAIN`
-	- `VITE_FIREBASE_PROJECT_ID`
-	- `VITE_FIREBASE_STORAGE_BUCKET`
-	- `VITE_FIREBASE_MESSAGING_SENDER_ID`
-	- `VITE_FIREBASE_APP_ID`
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
 
-5. Faça o push:
+5. Push the changes:
 
 ```bash
 git add .
@@ -128,22 +128,22 @@ git commit -m "Deploy application"
 git push origin main
 ```
 
-Depois que a action terminar, a aplicação estará disponível em:
+After the workflow completes, the application will be available at:
 
 ```text
-https://SEU_USUARIO.github.io/leetcode-dashboard/
+https://leolongato.github.io/leetcode-dashboard/
 ```
 
-O `vite.config.ts` já define o caminho base `/leetcode-dashboard/` durante o build do GitHub Actions. Se o repositório tiver outro nome, altere esse valor no arquivo antes de publicar. As variáveis `VITE_*` são injetadas no build pela action; os dados continuam protegidos pelas regras do Firestore e pela autenticação.
+The `vite.config.ts` file already sets `/leetcode-dashboard/` as the base path during GitHub Actions builds. If the repository has a different name, update that value before publishing. The `VITE_*` variables are injected into the build by the workflow; application data remains protected by Firestore rules and authentication.
 
-## Estrutura principal
+## Main structure
 
 ```text
 src/
-├── components/       # layout, navegação e componentes de interface
-├── components/tabs/  # telas de problemas, a fazer, revisão e Excalidraw
-├── lib/firebase.ts   # inicialização opcional do Firebase
-├── services/         # leitura e gravação de problemas e tarefas
-├── App.tsx           # estado e fluxos principais da aplicação
-└── types.ts          # tipos de domínio
+├── components/       # layout, navigation, and UI components
+├── components/tabs/  # Problems, To-do, Review, and Excalidraw screens
+├── lib/firebase.ts   # optional Firebase initialization
+├── services/         # problem and to-do data access
+├── App.tsx           # main application state and flows
+└── types.ts          # domain types
 ```
