@@ -12,11 +12,15 @@ import {
   BrushIcon,
   Chart01Icon,
   CheckmarkBadge01Icon,
+  CheckmarkCircleIcon,
+  Alert02Icon,
+  CancelCircleIcon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { Difficulty, Problem, ProblemStatus, Todo } from "@/types"
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
 
 export type DashboardTab = "problems" | "todo" | "review" | "excalidraw"
 
@@ -75,7 +79,30 @@ function StatusBadge({ status }: { status: ProblemStatus }) {
   return (
     <Badge className={tone}>
       <span aria-hidden="true" className="mr-1">
-        {status === "resolvido" ? "✓" : status === "ajuda" ? "!" : "×"}
+        {status === "resolvido" && (
+          <HugeiconsIcon
+            icon={CheckmarkCircleIcon}
+            size={16}
+            strokeWidth={1.8}
+            className="shrink-0"
+          />
+        )}
+        {status === "ajuda" && (
+          <HugeiconsIcon
+            icon={Alert02Icon}
+            size={16}
+            strokeWidth={1.8}
+            className="shrink-0"
+          />
+        )}
+        {status === "nao_resolvido" && (
+          <HugeiconsIcon
+            icon={CancelCircleIcon}
+            size={16}
+            strokeWidth={1.8}
+            className="shrink-0"
+          />
+        )}
       </span>
       {statusLabel[status]}
     </Badge>
@@ -421,14 +448,14 @@ export function TodoPanel({
           value={todoUrl}
           onChange={(event) => setTodoUrl(event.target.value)}
           placeholder="URL do leetcode (opcional)"
-          className="min-w-[180px] flex-1"
+          className="min-w-45 flex-1"
         />
         <Input
           name="title"
           value={todoTitle}
           onChange={(event) => updateTodoTitle(event.target.value)}
           placeholder="Nome do problema"
-          className="min-w-[180px] flex-1"
+          className="min-w-45 flex-1"
         />
         <Button type="submit">Adicionar</Button>
       </form>
@@ -460,22 +487,17 @@ export function TodoPanel({
               key={todo.id}
               className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
             >
-              <input
-                type="checkbox"
-                className="size-3.5 accent-primary"
-                aria-label={`Marcar ${todo.title}`}
-              />
               <a
                 href={todo.url || undefined}
                 target="_blank"
                 rel="noreferrer"
-                className="min-w-0 flex-1 truncate text-sm font-medium hover:text-primary"
+                className="min-w-0 flex-1 truncate text-sm font-medium text-primary underline-offset-4 hover:text-primary hover:underline"
               >
                 {todo.title}
               </a>
               <Button
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 onClick={() => onTry(todo)}
               >
@@ -483,7 +505,7 @@ export function TodoPanel({
               </Button>
               <Button
                 type="button"
-                variant="ghost"
+                variant="destructive"
                 size="sm"
                 onClick={() => onRemove(todo.id)}
               >
@@ -661,7 +683,7 @@ export function ProblemTable({
                     href={problem.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-medium hover:text-primary"
+                    className="min-w-0 flex-1 truncate text-sm font-medium text-primary underline-offset-4 hover:text-primary hover:underline"
                   >
                     {problem.title}
                   </a>
@@ -671,12 +693,21 @@ export function ProblemTable({
                     </Badge>
                   )}
                   {problem.notes && (
-                    <button
-                      onClick={() => onNotes(problem)}
-                      className="block max-w-xs truncate text-left text-xs text-muted-foreground hover:text-primary"
-                    >
-                      {problem.notes}
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            onClick={() => onNotes(problem)}
+                            className="block max-w-xs truncate text-left text-xs text-muted-foreground hover:text-primary"
+                          >
+                            {problem.notes}
+                          </button>
+                        }
+                      />
+                      <TooltipContent side="bottom" align="start">
+                        <p>{problem.notes}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                 </td>
                 <td className="px-5 py-4">
@@ -700,14 +731,14 @@ export function ProblemTable({
                 <td className="px-5 py-4">
                   <div className="flex justify-end gap-1.5">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => onEdit(problem)}
                     >
                       Editar
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="destructive"
                       size="sm"
                       className="text-destructive"
                       onClick={() => onDelete(problem.id)}

@@ -52,7 +52,7 @@ import type { User } from "firebase/auth"
 const tags = [
   "Array",
   "String",
-  "Set",
+  "Hash Set",
   "Hash Table",
   "Two Pointers",
   "Sliding Window",
@@ -78,6 +78,9 @@ const tags = [
   "Matrix",
   "Recursion",
   "Trie",
+  "Brute Force",
+  "Memoization",
+  "Binary Search Tree",
 ]
 
 const difficultyLabel: Record<Difficulty, string> = {
