@@ -48,40 +48,7 @@ import type {
   Todo,
 } from "@/types"
 import type { User } from "firebase/auth"
-
-const tags = [
-  "Array",
-  "String",
-  "Hash Set",
-  "Hash Table",
-  "Two Pointers",
-  "Sliding Window",
-  "Linked List",
-  "Stack",
-  "Queue",
-  "Tree",
-  "Binary Search",
-  "Graph",
-  "DFS",
-  "BFS",
-  "Dijkstra",
-  "Topological Sort",
-  "Prefix",
-  "Suffix",
-  "Heap",
-  "Backtracking",
-  "Dynamic Programming",
-  "Greedy",
-  "Sorting",
-  "Bit Manipulation",
-  "Math",
-  "Matrix",
-  "Recursion",
-  "Trie",
-  "Brute Force",
-  "Memoization",
-  "Binary Search Tree",
-]
+import { tags } from "./lib/tags"
 
 const difficultyLabel: Record<Difficulty, string> = {
   facil: "Fácil",
