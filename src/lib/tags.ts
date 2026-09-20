@@ -7,6 +7,7 @@ export const tags = [
   "Sliding Window",
   "Linked List",
   "Stack",
+  "Monotonic Stack",
   "Queue",
   "Tree",
   "Binary Search",
